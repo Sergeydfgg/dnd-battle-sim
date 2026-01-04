@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: dndsim-postgres
+    environment:
+      POSTGRES_USER: dnd
+      POSTGRES_PASSWORD: dnd
+      POSTGRES_DB: dndsim
+    ports:
+      - "5432:5432"
+    volumes:
+      - dndsim_pgdata:/var/lib/postgresql/data
+
+volumes:
+  dndsim_pgdata:
