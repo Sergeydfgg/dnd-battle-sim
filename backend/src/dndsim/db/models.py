@@ -7,6 +7,8 @@ from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
+from sqlalchemy import Column, Integer, Text
+from sqlalchemy.orm import relationship
 from .base import Base
 
 
@@ -54,15 +56,11 @@ class Encounter(Base):
 class EncounterSave(Base):
     __tablename__ = "encounter_saves"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    id = Column(Integer, primary_key=True)
+    encounter_id = Column(Integer, ForeignKey("encounter.id"))
+    label = Column(String, nullable=True)
+    state_json = Column(Text, nullable=False)  # хранение сериализованного состояния
+    events_json = Column(Text, nullable=False)  # хранение списка событий
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    encounter_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("encounters.id", ondelete="CASCADE"), index=True
-    )
-    label: Mapped[str | None] = mapped_column(String(200), nullable=True)
-
-    state_json: Mapped[dict] = mapped_column(JSON, nullable=False)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    encounter = relationship("Encounter", back_populates="saves")

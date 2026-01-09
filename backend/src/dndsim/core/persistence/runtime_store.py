@@ -3,7 +3,13 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import asdict, is_dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
+from dndsim.core.persistence.state_codec import (
+    encounter_state_to_dict,
+    encounter_state_from_dict,
+)
+
+from dndsim.db.models import EncounterSave
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import TypeAdapter
@@ -19,16 +25,72 @@ from dndsim.api.schemas import (  # type: ignore
 from dndsim.core.adapters.mapper import combatant_from_creature  # type: ignore
 from dndsim.core.engine.commands import Command
 from dndsim.core.engine.rules.apply import apply_command as engine_apply
-from dndsim.core.persistence.runtime_store.load_latest_snapshot import (
-    load_latest_snapshot,
-)  # type: ignore
-from dndsim.core.persistence.runtime_store.save_snapshot import save_snapshot  # type: ignore
 
-from dndsim.core.persistence.state_codec import encounter_state_to_dict
+
 from dndsim.db.deps import get_db  # type: ignore
 from dndsim.db.models import Creature, Encounter  # type: ignore
 
 router = APIRouter(prefix="/encounters", tags=["encounter-runtime"])
+
+
+def load_latest_snapshot(
+    db: Session, encounter_id: int
+) -> Tuple[Optional[int], Any, List[Dict[str, Any]]]:
+    """
+    Загружает последний снимок состояния для encounter_id.
+    Возвращает (save_id, state_obj, events_list).
+    """
+    # Получение последнего сохранения из базы данных
+    row: EncounterSave = (
+        db.query(EncounterSave)
+        .filter(EncounterSave.encounter_id == encounter_id)
+        .order_by(EncounterSave.id.desc())
+        .first()
+    )
+
+    if not row:
+        return None, None, []
+
+    # Десериализация состояния и событий
+    payload = json.loads(row.state_json)
+    state_dict: Dict[str, Any] = payload.get("state") or {}
+    events: List[Dict[str, Any]] = payload.get("events") or []
+
+    # Восстановление объекта состояния из сериализованных данных
+    state_obj = encounter_state_from_dict(state_dict)
+
+    return row.id, state_obj, events
+
+
+def save_snapshot(
+    db: Session,
+    encounter_id: int,
+    label: str,
+    state: Any,
+    events_delta: List[Dict[str, Any]],
+) -> EncounterSave:
+    """
+    Сохраняет текущий снимок состояния в базе данных.
+    """
+    # Сериализация состояния и событий
+    raw_state = json.dumps(
+        {"state": encounter_state_to_dict(state), "events": events_delta}
+    )
+
+    # Создание записи в таблице EncounterSave
+    save = EncounterSave(
+        encounter_id=encounter_id,
+        label=label,
+        state_json=raw_state,  # Сериализованное состояние
+        events_json=json.dumps(events_delta),  # Сериализованные события
+    )
+
+    # Добавление записи в базу данных
+    db.add(save)
+    db.commit()
+    db.refresh(save)
+
+    return save
 
 
 def _safe_dict(obj: Any) -> Dict[str, Any]:
