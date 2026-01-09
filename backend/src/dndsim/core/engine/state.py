@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from random import Random
 from uuid import uuid4
 from pydantic import BaseModel, Field, ConfigDict

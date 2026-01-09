@@ -10,6 +10,45 @@ Ability = Literal["str", "dex", "con", "int", "wis", "cha"]
 ResourceRefresh = Literal["turn", "short_rest", "long_rest", "encounter"]
 
 
+class PosDTO(BaseModel):
+    x: int = 0
+    y: int = 0
+
+
+class EncounterInitRequest(BaseModel):
+    label: str = "init"
+    reset_existing: bool = False
+
+
+class EncounterRuntimeResponse(BaseModel):
+    encounter_id: int
+    save_id: int
+    state: Dict[str, Any]
+    events_delta: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class AddCombatantRequest(BaseModel):
+    creature_id: int
+    side: str
+    position: PosDTO = Field(default_factory=PosDTO)
+    combatant_id: Optional[str] = None
+    # overrides передаём как dict, чтобы не зависеть от конкретного класса overrides
+    overrides: Optional[Dict[str, Any]] = None
+    label: str = "add"
+
+
+class ApplyCommandRequest(BaseModel):
+    command: Dict[str, Any]
+    label: str = "cmd"
+
+
+class GetEncounterStateResponse(BaseModel):
+    encounter_id: int
+    save_id: int
+    state: Dict[str, Any]
+    # для MVP можно не возвращать весь лог, только снапшот
+
+
 class ResourceSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
